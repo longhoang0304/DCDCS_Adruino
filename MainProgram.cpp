@@ -22,6 +22,9 @@ static DCMotor dcMotor(ENA, ENB);
 // init system status
 static SystemStatus sysStatus;
 static bool userControl = false;
+static byte dryerTimer = 30; // default 30 minutes
+static byte motorBtnPulse = 0;
+static byte dryerBtnPulse = 0;
 
 void setupLightSensor() {
   //  LightSensor.SetAddress(Device_Address_H);//Address 0x5C
@@ -82,24 +85,28 @@ Switch getSwitch() {
   return NO_SWITCH;
 }
 
+Action getAction(key) {
+  if (key == 1) {
+    return determineMotorAction();
+  }
+  if (key == 2) {
+    return determineDryerAction();;
+  }
+  if (key == 3) {
+    return INCREASE_DRYER_TIME;
+  }
+  if (key == 4) {
+    return DECREASE_DRYER_TIME;
+  }
+  return NO_ACTION;
+}
+
 /**
  * Listen button and return the actions
  */
 Action getActionFromKeyPad() {
   char key = keypad.getKey();
-  if (key == 'A') {
-    return PAUSE_MOTOR;
-  }
-  if (key == 'B') {
-    return START_DRYER;
-  }
-  if (key == 'C') {
-    return INCREASE_DRYER_TIME;
-  }
-  if (key == 'D') {
-    return DECREASE_DRYER_TIME;
-  }
-  return NO_ACTION;
+  return getAction(key - 'A');
 }
 
 byte readRfButton() {
@@ -116,19 +123,7 @@ byte readRfButton() {
 
 Action getActionFromRF() {
   byte key = readRfButton();
-  if (key == 1) {
-    return PAUSE_MOTOR;
-  }
-  if (key == 2) {
-    return START_DRYER;
-  }
-  if (key == 3) {
-    return INCREASE_DRYER_TIME;
-  }
-  if (key == 4) {
-    return DECREASE_DRYER_TIME;
-  }
-  return NO_ACTION;
+  return getAction(key);
 }
 
 bool isNight(uint16_t lux) {
@@ -147,6 +142,48 @@ void runDC(DC_DIRECTION direct) {
 void stopDC(SystemStatus stat) {
   dcMotor.move(STOP);
   sysStatus = stat;
+}
+
+void increaseTimer() {
+  dryerTimer += 5;
+  if (dryerTimer > 120)
+    dryerTimer = 120;
+}
+
+void decreaseTimer() {
+  dryerTimer -= 5;
+  if (dryerTimer < 5)
+    dryerTimer = 5;
+}
+
+Action determineMotorAction() {
+  motorBtnPulse = (motorBtnPulse + 1) % 4;
+  switch(motorBtnPulse) {
+    case 1: {
+      return DRY_CLOTHES;
+    }
+    case 3: {
+      return COLLECT_CLOTHES;
+    }
+    case 0:
+    case 2: {
+      return PAUSE_MOTOR;
+    }
+  }
+  return NO_ACTION;
+}
+
+Action determineDryerAction() {
+  dryerBtnPulse = (dryerBtnPulse + 1) % 2;
+  switch(dryerBtnPulse) {
+    case 0: {
+      return START_DRYER;
+    }
+    case 1: {
+      return STOP_DRYER;
+    }
+  }
+  return NO_ACTION;
 }
 
 #pragma endregion
@@ -184,6 +221,24 @@ void controlDCAtDay() {
   }
 }
 
+void actionControl(Action action) {
+  switch(action) {
+    case PAUSE_MOTOR: {
+      stopDC(PAUSED);
+      break;
+    }
+    case DRY_CLOTHES: {
+      runDC(FORWARD);
+      break;
+    }
+    case COLLECT_CLOTHES: {
+      runDC(BACKWARD);
+      break;
+    }
+  }
+}
+
+
 void autoControl(SensorData sensorData) {
   if (isNight(SensorData.lux)) {
     controlDCAtNight();
@@ -193,6 +248,8 @@ void autoControl(SensorData sensorData) {
 }
 
 void switchControl() {
+  if (dcMotor.getDirection() == SCALAR)
+    return;
   Switch swt = getSwitch();
   switch(swt) {
     case SWITCH_INSIDE: {
@@ -215,11 +272,13 @@ void switchControl() {
 }
 
 void buttonControl() {
-
+  Action action = getActionFromKeyPad();
+  actionControl(action);
 }
 
 void rfButtonControl() {
-
+  Action action = getActionFromRF();
+  actionControl(action);
 }
 
 void wifiControl() {
