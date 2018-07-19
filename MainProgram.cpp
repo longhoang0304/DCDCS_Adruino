@@ -21,7 +21,7 @@ static Keypad keypad = Keypad(
 static DCMotor dcMotor(ENA, ENB);
 // init system status
 static SystemStatus sysStatus;
-static bool lock = false;
+static bool userControl = false;
 
 void setupLightSensor() {
   //  LightSensor.SetAddress(Device_Address_H);//Address 0x5C
@@ -88,19 +88,15 @@ Switch getSwitch() {
 Action getActionFromKeyPad() {
   char key = keypad.getKey();
   if (key == 'A') {
-    // control DC
     return PAUSE_MOTOR;
   }
   if (key == 'B') {
-    // change dryer mode
     return START_DRYER;
   }
   if (key == 'C') {
-    // increase time
     return INCREASE_DRYER_TIME;
   }
   if (key == 'D') {
-    // decrease time
     return DECREASE_DRYER_TIME;
   }
   return NO_ACTION;
@@ -135,17 +131,109 @@ Action getActionFromRF() {
   return NO_ACTION;
 }
 
+bool isNight(uint16_t lux) {
+  return lux < 5;
+}
+
+bool isRaining() {
+  return digitalRead(RAIN_SENSOR_PIN);
+}
+
+void runDC(DC_DIRECTION direct) {
+  dcMotor.move(direct);
+  sysStatus = MOVING;
+}
+
+void stopDC(SystemStatus stat) {
+  dcMotor.move(STOP);
+  sysStatus = stat;
+}
+
 #pragma endregion
 
 // this region will be the main thread of arduino
 #pragma region
 
-void autoControl() {
+void readData(SensorData &sensorData) {
+  sensorData.humidity = dht.readHumidity();
+  sensorData.temperature = dht.readTemperature();
+  sensorData.lux = LightSensor.GetLightIntensity();
+}
+
+void controlDCAtNight() {
+  switch (sysStatus) {
+    case DRYING:
+      runDC(FORWARD);
+      break;
+  }
+}
+
+void controlDCAtDay() {
+  bool isRain = isRaining();
+  switch (sysStatus) {
+    case DRYING:
+      if (isRain) {
+        runDC(BACKWARD);
+      }
+      break;
+    case IDLING:
+      if (!isRain) {
+        runDC(FORWARD);
+      }
+      break;
+  }
+}
+
+void autoControl(SensorData sensorData) {
+  if (isNight(SensorData.lux)) {
+    controlDCAtNight();
+    return;
+  }
+  controlDCAtDay();
+}
+
+void switchControl() {
+  Switch swt = getSwitch();
+  switch(swt) {
+    case SWITCH_INSIDE: {
+      if (dcMotor.getDirection() == BACKWARD) {
+        stopDC(IDLING);
+      }
+      break;
+    }
+    case SWITCH_OUTSIDE: {
+      if (dcMotor.getDirection() == FORWARD) {
+        stopDC(DRYING);
+      }
+      break;
+    }
+    default: {
+      break;
+    }
+  }
+  return;
+}
+
+void buttonControl() {
+
+}
+
+void rfButtonControl() {
+
+}
+
+void wifiControl() {
 
 }
 
 void loop_event() {
-
+  SensorData sensorData;
+  readData(sensorData);
+  autoControl(SensorData);
+  buttonControl();
+  rfButtonControl();
+  wifiControl();
+  switchControl();
 }
 
 #pragma endregion

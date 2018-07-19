@@ -55,6 +55,12 @@ static char keys[ROWS][COLS] = {
 static byte rowPins[ROWS] = {22, 24, 26, 28}; //connect to the row pinouts of the keypad
 static byte colPins[COLS] = {23, 25, 27, 29}; //connect to the column pinouts of the keypad
 
+typedef struct data {
+  double humidity;
+  double temperature;
+  uint16_t lux;
+} SensorData;
+
 void loop_event();
 void setup_arduino();
 

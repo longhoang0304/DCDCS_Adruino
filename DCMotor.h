@@ -11,6 +11,7 @@ class DCMotor {
   private:
     byte ENA;
     byte ENB;
+    DC_DIRECTION direction;
     void stop();
     void moveForward();
     void moveForward(byte speed);
@@ -21,6 +22,7 @@ class DCMotor {
     void begin();
     void move(DC_DIRECTION direction);
     void move(DC_DIRECTION direction, byte speed);
+    DC_DIRECTION getDirection();
 };
 
 #endif

@@ -15,26 +15,31 @@ void DCMotor::begin() {
 void DCMotor::stop() {
   digitalWrite(ENA, LOW);
   digitalWrite(ENB, LOW);
+  this->direction = SCALAR;
 }
 
 void DCMotor::moveForward() {
   digitalWrite(ENA, LOW);
   digitalWrite(ENB, HIGH);
+  this->direction = FORWARD;
 }
 
 void DCMotor::moveForward(byte speed) {
   analogWrite(ENA, 0);
   analogWrite(ENB, speed);
+  this->direction = FORWARD;
 }
 
 void DCMotor::moveBackward() {
   digitalWrite(ENA, HIGH);
   digitalWrite(ENB, LOW);
+  this->direction = BACKWARD;
 }
 
 void DCMotor::moveBackward(byte speed) {
   analogWrite(ENA, speed);
   analogWrite(ENB, 0);
+  this->direction = BACKWARD;
 }
 
 void DCMotor::move(DC_DIRECTION direction) {
@@ -49,5 +54,9 @@ void DCMotor::move(DC_DIRECTION direction) {
       stop();
       break;
   }
+}
+
+DC_DIRECTION DCMotor::getDirection() {
+  return this->direction;
 }
 
