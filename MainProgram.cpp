@@ -235,9 +235,31 @@ void actionControl(Action action) {
       runDC(BACKWARD);
       break;
     }
+    case INCREASE_DRYER_TIME: {
+      increaseTimer();
+      break;
+    }
+    case DECREASE_DRYER_TIME: {
+      decreaseTimer();
+      break;
+    }
+    case RESET_DRYER_TIMER: {
+      dryerTimer = 30;
+      break;
+    }
+    case START_DRYER: {
+      // control dryer
+      break;
+    }
+    case STOP_DRYER: {
+      //stop dryer
+      break;
+    }
+    default: {
+      break;
+    }
   }
 }
-
 
 void autoControl(SensorData sensorData) {
   if (isNight(SensorData.lux)) {
