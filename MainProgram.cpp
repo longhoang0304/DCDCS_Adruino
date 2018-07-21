@@ -1,5 +1,5 @@
 #include "MainProgram.h"
-/*
+/**
  * Setup Arduino
  */
 #pragma region
@@ -67,14 +67,6 @@ void setup_arduino() {
 #pragma region
 
 /**
- * Read humidity and temperature from DHT
- */
-void readDHT(double &humidity, double &temperature) {
-  humidity = dht.readHumidity();
-  temperature = dht.readTemperature();
-}
-
-/**
  * Read switch signal and return
  */
 Switch getSwitch() {
@@ -85,6 +77,9 @@ Switch getSwitch() {
   return NO_SWITCH;
 }
 
+/**
+ * Get action from key
+ */
 Action getAction(key) {
   if (key == 1) {
     return determineMotorAction();
@@ -102,60 +97,8 @@ Action getAction(key) {
 }
 
 /**
- * Listen button and return the actions
+ * Determine DC Motor action by button pulse
  */
-Action getActionFromKeyPad() {
-  char key = keypad.getKey();
-  return getAction(key - 'A');
-}
-
-byte readRfButton() {
-  if(digitalRead(BUTTON_A))
-    return 1;
-  if(digitalRead(BUTTON_B))
-    return 2;
-  if(digitalRead(BUTTON_C))
-    return 3;
-  if(digitalRead(BUTTON_D))
-    return 4;
-  return 0;
-}
-
-Action getActionFromRF() {
-  byte key = readRfButton();
-  return getAction(key);
-}
-
-bool isNight(uint16_t lux) {
-  return lux < 5;
-}
-
-bool isRaining() {
-  return digitalRead(RAIN_SENSOR_PIN);
-}
-
-void runDC(DC_DIRECTION direct) {
-  dcMotor.move(direct);
-  sysStatus = MOVING;
-}
-
-void stopDC(SystemStatus stat) {
-  dcMotor.move(STOP);
-  sysStatus = stat;
-}
-
-void increaseTimer() {
-  dryerTimer += 5;
-  if (dryerTimer > 120)
-    dryerTimer = 120;
-}
-
-void decreaseTimer() {
-  dryerTimer -= 5;
-  if (dryerTimer < 5)
-    dryerTimer = 5;
-}
-
 Action determineMotorAction() {
   motorBtnPulse = (motorBtnPulse + 1) % 4;
   switch(motorBtnPulse) {
@@ -173,6 +116,9 @@ Action determineMotorAction() {
   return NO_ACTION;
 }
 
+/**
+ * Determine dryer action by dryer button pulse
+ */
 Action determineDryerAction() {
   dryerBtnPulse = (dryerBtnPulse + 1) % 2;
   switch(dryerBtnPulse) {
@@ -186,25 +132,113 @@ Action determineDryerAction() {
   return NO_ACTION;
 }
 
+/**
+ * Listen button and return the actions
+ */
+Action getActionFromKeyPad() {
+  char key = keypad.getKey();
+  return getAction(key - 'A');
+}
+
+/**
+ * Read data from rf
+ */
+byte readRfButton() {
+  if(digitalRead(BUTTON_A))
+    return 1;
+  if(digitalRead(BUTTON_B))
+    return 2;
+  if(digitalRead(BUTTON_C))
+    return 3;
+  if(digitalRead(BUTTON_D))
+    return 4;
+  return 0;
+}
+
+/**
+ * Listen rf button and return the actions
+ */
+Action getActionFromRF() {
+  byte key = readRfButton();
+  return getAction(key);
+}
+
+/**
+ * Check if is night or not
+ */
+bool isNight(uint16_t lux) {
+  return lux < 5;
+}
+
+/**
+ * Check if is raining
+ */
+bool isRaining() {
+  return digitalRead(RAIN_SENSOR_PIN);
+}
+
+/**
+ * Control dc
+ */
+void runDC(DC_DIRECTION direct) {
+  dcMotor.move(direct);
+  sysStatus = MOVING;
+}
+
+/**
+ * Stop dc
+ */
+void stopDC(SystemStatus stat) {
+  dcMotor.move(STOP);
+  sysStatus = stat;
+}
+
+/**
+ * Increase dryer timer
+ */
+void increaseTimer() {
+  dryerTimer += 5;
+  if (dryerTimer > 120)
+    dryerTimer = 120;
+}
+
+/**
+ * Decrease dryer timer
+ */
+void decreaseTimer() {
+  dryerTimer -= 5;
+  if (dryerTimer < 5)
+    dryerTimer = 5;
+}
+
 #pragma endregion
 
 // this region will be the main thread of arduino
 #pragma region
 
+/**
+ * Read data from sensor
+ */
 void readData(SensorData &sensorData) {
   sensorData.humidity = dht.readHumidity();
   sensorData.temperature = dht.readTemperature();
   sensorData.lux = LightSensor.GetLightIntensity();
 }
 
+/**
+ * Control system when night
+ */
 void controlDCAtNight() {
   switch (sysStatus) {
     case DRYING:
-      runDC(FORWARD);
+      runDC(BACKWARE);
       break;
   }
 }
 
+/**
+ * Control system at day
+ */
 void controlDCAtDay() {
   bool isRain = isRaining();
   switch (sysStatus) {
@@ -221,6 +255,9 @@ void controlDCAtDay() {
   }
 }
 
+/**
+ * Control system based on action
+ */
 void actionControl(Action action) {
   switch(action) {
     case PAUSE_MOTOR: {
@@ -261,6 +298,9 @@ void actionControl(Action action) {
   }
 }
 
+/**
+ * Autocontroller
+ */
 void autoControl(SensorData sensorData) {
   if (isNight(SensorData.lux)) {
     controlDCAtNight();
@@ -269,6 +309,9 @@ void autoControl(SensorData sensorData) {
   controlDCAtDay();
 }
 
+/**
+ * Control system by switch signal
+ */
 void switchControl() {
   if (dcMotor.getDirection() == SCALAR)
     return;
@@ -293,20 +336,32 @@ void switchControl() {
   return;
 }
 
+/**
+ * Control system by button
+ */
 void buttonControl() {
   Action action = getActionFromKeyPad();
   actionControl(action);
 }
 
+/**
+ * Control system by rf button
+ */
 void rfButtonControl() {
   Action action = getActionFromRF();
   actionControl(action);
 }
 
+/**
+ * Control system by wifi command
+ */
 void wifiControl() {
 
 }
 
+/**
+ * Main loop, single thread
+ */
 void loop_event() {
   SensorData sensorData;
   readData(sensorData);

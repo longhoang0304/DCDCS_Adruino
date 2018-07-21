@@ -21,6 +21,7 @@
 
 // DHT PIN
 #define DHT_PIN 7
+#define DHT_TYPE DHT11
 
 // RF PIN
 #define BUTTON_A 8
@@ -28,7 +29,12 @@
 #define BUTTON_C 10
 #define BUTTON_D 11
 
-#define DHT_TYPE DHT11
+// LCD5110
+#define RST 15
+#define SCE 14
+#define DC  16
+#define DIN 17
+#define CLK 18
 
 enum SystemStatus { IDLING, DRYING, MOVING, PAUSED, DRYER_ACTIVATED };
 enum Switch { NO_SWITCH, SWITCH_OUTSIDE, SWITCH_INSIDE };
