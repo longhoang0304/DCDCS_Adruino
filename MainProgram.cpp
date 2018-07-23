@@ -26,6 +26,8 @@ static byte dryerTimer = 30; // default 30 minutes
 static byte motorBtnPulse = 0;
 static byte dryerBtnPulse = 0;
 
+static SensorData sensorData;
+
 void setupLightSensor() {
   //  LightSensor.SetAddress(Device_Address_H);//Address 0x5C
   //  To adjust the slave on other address , uncomment this line
@@ -49,12 +51,21 @@ void setupPinMode() {
   pinMode(BUTTON_B, INPUT);
   pinMode(BUTTON_C, INPUT);
   pinMode(BUTTON_D, INPUT);
+  pinMode(DRYER1_PIN, OUTPUT);
+  pinMode(DRYER2_PIN, OUTPUT);
+}
+
+void setupI2C() {
+  Wire.begin(MASTER_ADDRESS);
+  Wire.onRequest(sendESP8266Data);
+  Wire.onReceive(handleESP8266Request);
 }
 
 // setup all arduino
 void setup_arduino() {
   setupLCD();
   setupLightSensor();
+  setupI2C();
   dht.begin();
   dcMotor.begin();
   setupPinMode();
@@ -65,6 +76,57 @@ void setup_arduino() {
 
 // this region for misc functions
 #pragma region
+
+template<typename T> byte *convertValueToByteArray(T value) {
+  if (value <= 1) value = 0;
+  const size_t blen = sizeof(byte);
+  const size_t len = sizeof(T) / blen;
+  byte index = 0;
+  byte * arr;
+  arr = (byte *)calloc(len, blen);
+  while(value) {
+    arr[index] = value & 0xff;
+    value >>= blen;
+    index++;
+  }
+  return arr;
+}
+
+template<typename T> void copyValueToByteArray(T value, byte *data, byte &i) {
+  byte * arr = convertValueToByteArray<T>(value);
+  byte len = sizeof(T) / sizeof(byte);
+  byte j = 0;
+  while(len) {
+    data[i++] = arr[j++];
+    len--;
+  }
+  free(arr);
+}
+
+void sendESP8266Data() {
+  const size_t length = sizeof(SensorData) / sizeof(byte);
+  byte i = 0;
+  byte data[length] = {0};
+
+  // copy humidity to array
+  copyValueToByteArray<double>(sensorData.humidity, data, i);
+  // copy temperatur to array
+  copyValueToByteArray<double>(sensorData.temperature, data, i);
+  // copy lux to array
+  copyValueToByteArray<uint16_t>(sensorData.lux, data, i);
+  // send data to esp8266
+  Wire.wire(data, length);
+}
+
+void handleESP8266Request(int numBytes) {
+  byte data[numBytes] = {0};
+  byte i = 0;
+  while(1 < Wire.available()) {
+    data[i] = Wire.read();
+    i++;
+  }
+  actionControl(data[0], data[1]);
+}
 
 /**
  * Read switch signal and return
@@ -219,7 +281,7 @@ void decreaseTimer() {
 /**
  * Read data from sensor
  */
-void readData(SensorData &sensorData) {
+void readData() {
   sensorData.humidity = dht.readHumidity();
   sensorData.temperature = dht.readTemperature();
   sensorData.lux = LightSensor.GetLightIntensity();
@@ -258,13 +320,17 @@ void controlDCAtDay() {
 /**
  * Control system based on action
  */
-void actionControl(Action action) {
+void actionControl(Action action, byte timer = 0) {
   switch(action) {
     case PAUSE_MOTOR: {
+      if (sysStatus != MOVING)
+        break;
       stopDC(PAUSED);
       break;
     }
     case DRY_CLOTHES: {
+      if(sysStatus == DRYER_ACTIVATED)
+        actionControl(STOP_DRYER);
       runDC(FORWARD);
       break;
     }
@@ -280,16 +346,26 @@ void actionControl(Action action) {
       decreaseTimer();
       break;
     }
+    case SET_DRYER_TIME: {
+      dryerTimer = timer;
+    }
     case RESET_DRYER_TIMER: {
       dryerTimer = 30;
       break;
     }
     case START_DRYER: {
-      // control dryer
+      if(sysStatus != IDLING)
+        break;
+      sysStatus = DRYER_ACTIVATED;
+      digitalWrite(DRYER1_PIN, HIGH);
+      digitalWrite(DRYER2_PIN, HIGH);
       break;
     }
     case STOP_DRYER: {
-      //stop dryer
+      sysStatus = IDLING;
+      digitalWrite(DRYER1_PIN, LOW);
+      digitalWrite(DRYER2_PIN, LOW);
+      dryerTimer = 30;
       break;
     }
     default: {
@@ -301,8 +377,8 @@ void actionControl(Action action) {
 /**
  * Autocontroller
  */
-void autoControl(SensorData sensorData) {
-  if (isNight(SensorData.lux)) {
+void autoControl() {
+  if (isNight(sensorData.lux)) {
     controlDCAtNight();
     return;
   }
@@ -352,24 +428,38 @@ void rfButtonControl() {
   actionControl(action);
 }
 
-/**
- * Control system by wifi command
- */
-void wifiControl() {
+void printData() {
 
+}
+
+void handleDryerTimer(ul start, ul end) {
+  if (sysStatus != DRYER_ACTIVATED)
+    return;
+  static ul accTime += (end - start);
+  if (accTime < 0) accTime = 0; // incease that timer is reset
+  if (accTime >= ONE_MINUTE) {
+    dryerTimer -= 1;
+    accTime = 0;
+    if (dryerTimer < 1) {
+      actionControl(STOP_DRYER);
+    }
+  }
 }
 
 /**
  * Main loop, single thread
  */
 void loop_event() {
-  SensorData sensorData;
-  readData(sensorData);
-  autoControl(SensorData);
+  ul start = millis();
+  readData();
+  autoControl();
   buttonControl();
   rfButtonControl();
-  wifiControl();
   switchControl();
+  printData();
+  ul end = millis();
+  handleDryerTimer(start, end);
+  delay(50);
 }
 
 #pragma endregion

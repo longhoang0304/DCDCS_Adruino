@@ -36,6 +36,17 @@
 #define DIN 17
 #define CLK 18
 
+//dryer H-Bridge pin
+#define DRYER1_PIN 30
+#define DRYER2_PIN 31
+
+// I2C Communication
+#define SCL 21
+#define SDA 20
+
+#define MASTER_ADDRESS 0x01
+#define SLAVE_ADDRESS 0X02
+
 enum SystemStatus { IDLING, DRYING, MOVING, PAUSED, DRYER_ACTIVATED };
 enum Switch { NO_SWITCH, SWITCH_OUTSIDE, SWITCH_INSIDE };
 enum Action {
@@ -44,6 +55,7 @@ enum Action {
   PAUSE_MOTOR,
   INCREASE_DRYER_TIME,
   DECREASE_DRYER_TIME,
+  SET_DRYER_TIME, //this action can only perform through android app
   START_DRYER,
   STOP_DRYER,
   RESET_DRYER_TIMER,
@@ -62,10 +74,13 @@ static byte rowPins[ROWS] = {22, 24, 26, 28}; //connect to the row pinouts of th
 static byte colPins[COLS] = {23, 25, 27, 29}; //connect to the column pinouts of the keypad
 
 typedef struct data {
+  uint16_t lux;
   double humidity;
   double temperature;
-  uint16_t lux;
 } SensorData;
+
+typedef unsigned long ul;
+#define ONE_MINUTE 1000 * 60
 
 void loop_event();
 void setup_arduino();
