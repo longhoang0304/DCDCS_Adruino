@@ -21,12 +21,18 @@ static Keypad keypad = Keypad(
 static DCMotor dcMotor(ENA, ENB);
 // init system status
 static SystemStatus sysStatus;
+// check if user is taking control
 static bool userControl = false;
+// timer for dryer
 static byte dryerTimer = 30; // default 30 minutes
+// pulse cuont for button press
 static byte motorBtnPulse = 0;
+// pulse count for dryer button press
 static byte dryerBtnPulse = 0;
-
+// data from sensors
 static SensorData sensorData;
+// ip address
+static IPAddress ip = {0};
 
 void setupLightSensor() {
   //  LightSensor.SetAddress(Device_Address_H);//Address 0x5C
@@ -79,11 +85,10 @@ void setup_arduino() {
 
 template<typename T> byte *convertValueToByteArray(T value) {
   if (value <= 1) value = 0;
-  const size_t blen = sizeof(byte);
-  const size_t len = sizeof(T) / blen;
+  const size_t len = sizeof(T);
   byte index = 0;
   byte * arr;
-  arr = (byte *)calloc(len, blen);
+  arr = (byte *)calloc(len, sizeof(byte));
   while(value) {
     arr[index] = value & 0xff;
     value >>= blen;
@@ -94,7 +99,7 @@ template<typename T> byte *convertValueToByteArray(T value) {
 
 template<typename T> void copyValueToByteArray(T value, byte *data, byte &i) {
   byte * arr = convertValueToByteArray<T>(value);
-  byte len = sizeof(T) / sizeof(byte);
+  byte len = sizeof(T);
   byte j = 0;
   while(len) {
     data[i++] = arr[j++];
@@ -104,7 +109,7 @@ template<typename T> void copyValueToByteArray(T value, byte *data, byte &i) {
 }
 
 void sendESP8266Data() {
-  const size_t length = sizeof(SensorData) / sizeof(byte);
+  const size_t length = sizeof(SensorData);
   byte i = 0;
   byte data[length] = {0};
 
@@ -125,7 +130,23 @@ void handleESP8266Request(int numBytes) {
     data[i] = Wire.read();
     i++;
   }
-  actionControl(data[0], data[1]);
+  switch(data[0]) {
+    case PERFORM_ACTION: {
+      actionControl(data[1], data[2]);
+      break;
+    }
+    case UPDATE_IP: {
+      uint32_t dword = 0;
+      for(int i = 1; i < 5; i++) {
+        dword += data[i];
+        dword <<= 0x08;
+      }
+      ip.address = dword;
+      break;
+    }
+    default:
+      break;
+  }
 }
 
 /**

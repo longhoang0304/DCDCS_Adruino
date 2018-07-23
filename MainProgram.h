@@ -47,6 +47,7 @@
 #define MASTER_ADDRESS 0x01
 #define SLAVE_ADDRESS 0X02
 
+enum WifiRequestType { PERFORM_ACTION, UPDATE_IP };
 enum SystemStatus { IDLING, DRYING, MOVING, PAUSED, DRYER_ACTIVATED };
 enum Switch { NO_SWITCH, SWITCH_OUTSIDE, SWITCH_INSIDE };
 enum Action {
@@ -78,6 +79,13 @@ typedef struct data {
   double humidity;
   double temperature;
 } SensorData;
+
+typedef struct IPAddress {
+  union {
+    uint8_t bytes[4];  // IPv4 address
+    uint32_t dword;
+  } address;
+} IPAddress;
 
 typedef unsigned long ul;
 #define ONE_MINUTE 1000 * 60
