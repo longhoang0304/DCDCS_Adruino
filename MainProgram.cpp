@@ -2,9 +2,12 @@
 /**
  * Setup Arduino
  */
+
+void sendESP8266Data();
+void handleESP8266Request(int numBytes);
+void actionControl(Action action, byte timer = 0);
+
 #pragma region
-// set the LCD address to 0x27 for a 16 chars and 2 line display
-static LiquidCrystal_I2C lcd(0x3F, 20, 4);
 // init light sensor object
 static BH1750FVI LightSensor;
 // init dht object
@@ -33,6 +36,10 @@ static byte dryerBtnPulse = 0;
 static SensorData sensorData;
 // ip address
 static IPAddress ip = {0};
+// lcd5110
+Adafruit_PCD8544 display = Adafruit_PCD8544(CLK, DIN, DC, SCE, RST);
+//
+static ul accTime = 0;
 
 void setupLightSensor() {
   //  LightSensor.SetAddress(Device_Address_H);//Address 0x5C
@@ -44,8 +51,11 @@ void setupLightSensor() {
 
 // setup lcd
 void setupLCD() {
-  lcd.init();
-  lcd.backlight();
+  display.begin();
+  display.setContrast(50);
+  display.display(); // show splashscreen
+  display.clearDisplay();   // clears the screen and buffer
+  display.setCursor(0, 0);
 }
 
 // set up pin mode for another pins
@@ -53,12 +63,11 @@ void setupPinMode() {
   pinMode(RAIN_SENSOR_PIN, INPUT);
   pinMode(L1, INPUT);
   pinMode(L2, INPUT);
+  pinMode(DRYER_PIN, OUTPUT);
   pinMode(BUTTON_A, INPUT);
   pinMode(BUTTON_B, INPUT);
   pinMode(BUTTON_C, INPUT);
   pinMode(BUTTON_D, INPUT);
-  pinMode(DRYER1_PIN, OUTPUT);
-  pinMode(DRYER2_PIN, OUTPUT);
 }
 
 void setupI2C() {
@@ -75,7 +84,7 @@ void setup_arduino() {
   dht.begin();
   dcMotor.begin();
   setupPinMode();
-  sysStatus = IDLING;
+  sysStatus = DRYING;
   Serial.begin(9600);
 }
 #pragma endregion
@@ -85,13 +94,14 @@ void setup_arduino() {
 
 template<typename T> byte *convertValueToByteArray(T value) {
   if (value <= 1) value = 0;
+  uint64_t v = *((uint64_t *)((void *)&value));
   const size_t len = sizeof(T);
   byte index = 0;
   byte * arr;
   arr = (byte *)calloc(len, sizeof(byte));
-  while(value) {
-    arr[index] = value & 0xff;
-    value >>= blen;
+  while(v) {
+    arr[index] = v & 0xff;
+    v >>= 0x08;
     index++;
   }
   return arr;
@@ -120,7 +130,7 @@ void sendESP8266Data() {
   // copy lux to array
   copyValueToByteArray<uint16_t>(sensorData.lux, data, i);
   // send data to esp8266
-  Wire.wire(data, length);
+  Wire.write(data, length);
 }
 
 void handleESP8266Request(int numBytes) {
@@ -141,7 +151,7 @@ void handleESP8266Request(int numBytes) {
         dword += data[i];
         dword <<= 0x08;
       }
-      ip.address = dword;
+      ip.address.dword = dword;
       break;
     }
     default:
@@ -155,28 +165,12 @@ void handleESP8266Request(int numBytes) {
 Switch getSwitch() {
   bool l1 = digitalRead(L1);
   bool l2 = digitalRead(L2);
+  Serial.println(l1);
+  Serial.println(l2);
+  if (l1 && l2) return NO_SWITCH;
   if (!l2) return SWITCH_INSIDE;
   if (!l1) return SWITCH_OUTSIDE;
   return NO_SWITCH;
-}
-
-/**
- * Get action from key
- */
-Action getAction(key) {
-  if (key == 1) {
-    return determineMotorAction();
-  }
-  if (key == 2) {
-    return determineDryerAction();;
-  }
-  if (key == 3) {
-    return INCREASE_DRYER_TIME;
-  }
-  if (key == 4) {
-    return DECREASE_DRYER_TIME;
-  }
-  return NO_ACTION;
 }
 
 /**
@@ -215,11 +209,38 @@ Action determineDryerAction() {
   return NO_ACTION;
 }
 
+
+/**
+ * Get action from key
+ */
+Action getAction(byte key) {
+  if (key == 1) {
+    return determineMotorAction();
+  }
+  if (key == 2) {
+    return determineDryerAction();
+  }
+  if (key == 3) {
+    return INCREASE_DRYER_TIME;
+  }
+  if (key == 4) {
+    return DECREASE_DRYER_TIME;
+  }
+  return NO_ACTION;
+}
+
+
 /**
  * Listen button and return the actions
  */
 Action getActionFromKeyPad() {
   char key = keypad.getKey();
+  if(key == NO_KEY) {
+    Serial.println("NO KEY");
+    return getAction(-1);
+  }
+  Serial.println("KEYPAD");
+  Serial.println(key);
   return getAction(key - 'A');
 }
 
@@ -257,7 +278,7 @@ bool isNight(uint16_t lux) {
  * Check if is raining
  */
 bool isRaining() {
-  return digitalRead(RAIN_SENSOR_PIN);
+  return !digitalRead(RAIN_SENSOR_PIN);
 }
 
 /**
@@ -314,7 +335,7 @@ void readData() {
 void controlDCAtNight() {
   switch (sysStatus) {
     case DRYING:
-      runDC(BACKWARE);
+      runDC(BACKWARD);
       break;
   }
 }
@@ -324,7 +345,9 @@ void controlDCAtNight() {
  */
 void controlDCAtDay() {
   bool isRain = isRaining();
+  Serial.println(isRain);
   switch (sysStatus) {
+    case PAUSED:
     case DRYING:
       if (isRain) {
         runDC(BACKWARD);
@@ -342,6 +365,7 @@ void controlDCAtDay() {
  * Control system based on action
  */
 void actionControl(Action action, byte timer = 0) {
+  bool isRain = isRaining();
   switch(action) {
     case PAUSE_MOTOR: {
       if (sysStatus != MOVING)
@@ -352,6 +376,7 @@ void actionControl(Action action, byte timer = 0) {
     case DRY_CLOTHES: {
       if(sysStatus == DRYER_ACTIVATED)
         actionControl(STOP_DRYER);
+      if (isRain) return;
       runDC(FORWARD);
       break;
     }
@@ -378,14 +403,12 @@ void actionControl(Action action, byte timer = 0) {
       if(sysStatus != IDLING)
         break;
       sysStatus = DRYER_ACTIVATED;
-      digitalWrite(DRYER1_PIN, HIGH);
-      digitalWrite(DRYER2_PIN, HIGH);
+      digitalWrite(DRYER_PIN, HIGH);
       break;
     }
     case STOP_DRYER: {
       sysStatus = IDLING;
-      digitalWrite(DRYER1_PIN, LOW);
-      digitalWrite(DRYER2_PIN, LOW);
+      digitalWrite(DRYER_PIN, LOW);
       dryerTimer = 30;
       break;
     }
@@ -410,9 +433,9 @@ void autoControl() {
  * Control system by switch signal
  */
 void switchControl() {
+  Switch swt = getSwitch();
   if (dcMotor.getDirection() == SCALAR)
     return;
-  Switch swt = getSwitch();
   switch(swt) {
     case SWITCH_INSIDE: {
       if (dcMotor.getDirection() == BACKWARD) {
@@ -454,9 +477,10 @@ void printData() {
 }
 
 void handleDryerTimer(ul start, ul end) {
-  if (sysStatus != DRYER_ACTIVATED)
+  if (sysStatus != DRYER_ACTIVATED) {
     return;
-  static ul accTime += (end - start);
+  }
+  accTime += (end - start);
   if (accTime < 0) accTime = 0; // incease that timer is reset
   if (accTime >= ONE_MINUTE) {
     dryerTimer -= 1;
@@ -474,13 +498,24 @@ void loop_event() {
   ul start = millis();
   readData();
   autoControl();
+  Serial.println("AUTO");
+  Serial.println(sysStatus);
   buttonControl();
+  Serial.println("BUTTON");
+  Serial.println(sysStatus);
   rfButtonControl();
+  Serial.println("RF");
+  Serial.println(sysStatus);
   switchControl();
+  Serial.println("SWITCH");
+  Serial.println(sysStatus);
   printData();
   ul end = millis();
   handleDryerTimer(start, end);
-  delay(50);
+  Serial.println("FINAL");
+  Serial.println(sysStatus);
+  Serial.println("\n\n");
+  delay(1000);
 }
 
 #pragma endregion

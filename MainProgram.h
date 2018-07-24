@@ -1,12 +1,14 @@
 #ifndef MAIN_PROGRAM_H
 #define MAIN_PROGRAM_H
+#include <SPI.h>
 #include <Wire.h>
-#include <BH1750FVI.h>
-#include <LiquidCrystal_I2C.h>
 #include <DHT.h>
 #include <Thread.h>
 #include <Keypad.h>
 #include <DCMotor.h>
+#include <BH1750FVI.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_PCD8544.h>
 
 // RAIN SENSOR PIN
 #define RAIN_SENSOR_PIN 2
@@ -37,8 +39,7 @@
 #define CLK 18
 
 //dryer H-Bridge pin
-#define DRYER1_PIN 30
-#define DRYER2_PIN 31
+#define DRYER_PIN 30
 
 // I2C Communication
 #define SCL 21
@@ -80,11 +81,13 @@ typedef struct data {
   double temperature;
 } SensorData;
 
-typedef struct IPAddress {
-  union {
+union address {
     uint8_t bytes[4];  // IPv4 address
     uint32_t dword;
-  } address;
+} ;
+
+typedef struct IPAddress {
+  address address;
 } IPAddress;
 
 typedef unsigned long ul;
