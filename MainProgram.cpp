@@ -63,11 +63,13 @@ void setupPinMode() {
   pinMode(RAIN_SENSOR_PIN, INPUT);
   pinMode(L1, INPUT);
   pinMode(L2, INPUT);
-  pinMode(DRYER_PIN, OUTPUT);
+  pinMode(DRYER_EN4, OUTPUT);
+  pinMode(DRYER_EN3, OUTPUT);
   pinMode(BUTTON_A, INPUT);
   pinMode(BUTTON_B, INPUT);
   pinMode(BUTTON_C, INPUT);
   pinMode(BUTTON_D, INPUT);
+  digitalWrite(DRYER_EN3, LOW);
 }
 
 void setupI2C() {
@@ -163,13 +165,13 @@ void handleESP8266Request(int numBytes) {
  * Read switch signal and return
  */
 Switch getSwitch() {
+  if (sysStatus != MOVING) return;
   bool l1 = digitalRead(L1);
   bool l2 = digitalRead(L2);
-  Serial.println(l1);
-  Serial.println(l2);
   if (l1 && l2) return NO_SWITCH;
-  if (!l2) return SWITCH_INSIDE;
-  if (!l1) return SWITCH_OUTSIDE;
+  if (!l1 && !l2) return NO_SWITCH;
+  if (l1) return SWITCH_INSIDE;
+  if (l2) return SWITCH_OUTSIDE;
   return NO_SWITCH;
 }
 
@@ -236,12 +238,9 @@ Action getAction(byte key) {
 Action getActionFromKeyPad() {
   char key = keypad.getKey();
   if(key == NO_KEY) {
-    Serial.println("NO KEY");
-    return getAction(-1);
+    return getAction(0);
   }
-  Serial.println("KEYPAD");
-  Serial.println(key);
-  return getAction(key - 'A');
+  return getAction(key - 'A' + 1);
 }
 
 /**
@@ -345,6 +344,7 @@ void controlDCAtNight() {
  */
 void controlDCAtDay() {
   bool isRain = isRaining();
+  Serial.println("IS RAIN");
   Serial.println(isRain);
   switch (sysStatus) {
     case PAUSED:
@@ -403,12 +403,12 @@ void actionControl(Action action, byte timer = 0) {
       if(sysStatus != IDLING)
         break;
       sysStatus = DRYER_ACTIVATED;
-      digitalWrite(DRYER_PIN, HIGH);
+      digitalWrite(DRYER_EN4, HIGH);
       break;
     }
     case STOP_DRYER: {
       sysStatus = IDLING;
-      digitalWrite(DRYER_PIN, LOW);
+      digitalWrite(DRYER_EN4, LOW);
       dryerTimer = 30;
       break;
     }
@@ -498,24 +498,24 @@ void loop_event() {
   ul start = millis();
   readData();
   autoControl();
-  Serial.println("AUTO");
-  Serial.println(sysStatus);
+  // Serial.println("AUTO");
+  // Serial.println(sysStatus);
   buttonControl();
-  Serial.println("BUTTON");
-  Serial.println(sysStatus);
+  // Serial.println("BUTTON");
+  // Serial.println(sysStatus);
   rfButtonControl();
-  Serial.println("RF");
-  Serial.println(sysStatus);
+  // Serial.println("RF");
+  // Serial.println(sysStatus);
   switchControl();
-  Serial.println("SWITCH");
-  Serial.println(sysStatus);
+  // Serial.println("SWITCH");
+  // Serial.println(sysStatus);
   printData();
   ul end = millis();
   handleDryerTimer(start, end);
-  Serial.println("FINAL");
-  Serial.println(sysStatus);
+  // Serial.println("FINAL");
+  // Serial.println(sysStatus);
   Serial.println("\n\n");
-  delay(1000);
+  delay(1500);
 }
 
 #pragma endregion
