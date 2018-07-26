@@ -179,18 +179,17 @@ Switch getSwitch() {
  * Determine DC Motor action by button pulse
  */
 Action determineMotorAction() {
-  motorBtnPulse = (motorBtnPulse + 1) % 4;
-  switch(motorBtnPulse) {
-    case 1: {
-      return DRY_CLOTHES;
-    }
-    case 3: {
+  switch(sysStatus) {
+    case DRYING:
       return COLLECT_CLOTHES;
-    }
-    case 0:
-    case 2: {
+    case IDLING:
+      return DRY_CLOTHES;
+    case MOVING:
       return PAUSE_MOTOR;
-    }
+    case PAUSED:
+      motorBtnPulse = (motorBtnPulse + 1) % 2;
+      if (motorBtnPulse) return DRY_CLOTHES;
+      return COLLECT_CLOTHES;
   }
   return NO_ACTION;
 }
@@ -202,9 +201,17 @@ Action determineDryerAction() {
   dryerBtnPulse = (dryerBtnPulse + 1) % 2;
   switch(dryerBtnPulse) {
     case 0: {
+      if(sysStatus != IDLING) {
+        dryerBtnPulse = 0;
+        return NO_ACTION;
+      }
       return START_DRYER;
     }
     case 1: {
+      if (sysStatus != DRYER_ACTIVATED) {
+        dryerBtnPulse = 1;
+        return NO_ACTION;
+      }
       return STOP_DRYER;
     }
   }
@@ -238,9 +245,9 @@ Action getAction(byte key) {
 Action getActionFromKeyPad() {
   char key = keypad.getKey();
   if(key == NO_KEY) {
-    return getAction(0);
+    return getAction(-1);
   }
-  return getAction(key - 'A' + 1);
+  return getAction((key - 'A') + 1);
 }
 
 /**
@@ -344,8 +351,6 @@ void controlDCAtNight() {
  */
 void controlDCAtDay() {
   bool isRain = isRaining();
-  Serial.println("IS RAIN");
-  Serial.println(isRain);
   switch (sysStatus) {
     case PAUSED:
     case DRYING:
@@ -353,11 +358,11 @@ void controlDCAtDay() {
         runDC(BACKWARD);
       }
       break;
-    case IDLING:
-      if (!isRain) {
-        runDC(FORWARD);
-      }
-      break;
+    // case IDLING:
+    //   if (!isRain) {
+    //     runDC(FORWARD);
+    //   }
+    //   break;
   }
 }
 
@@ -377,6 +382,7 @@ void actionControl(Action action, byte timer = 0) {
       if(sysStatus == DRYER_ACTIVATED)
         actionControl(STOP_DRYER);
       if (isRain) return;
+      Serial.println("ABCCC");
       runDC(FORWARD);
       break;
     }
@@ -400,8 +406,7 @@ void actionControl(Action action, byte timer = 0) {
       break;
     }
     case START_DRYER: {
-      if(sysStatus != IDLING)
-        break;
+      if(sysStatus != IDLING) return;
       sysStatus = DRYER_ACTIVATED;
       digitalWrite(DRYER_EN4, HIGH);
       break;
@@ -498,24 +503,24 @@ void loop_event() {
   ul start = millis();
   readData();
   autoControl();
-  // Serial.println("AUTO");
-  // Serial.println(sysStatus);
+  Serial.println("AUTO");
+  Serial.println(sysStatus);
   buttonControl();
-  // Serial.println("BUTTON");
-  // Serial.println(sysStatus);
+  Serial.println("BUTTON");
+  Serial.println(sysStatus);
   rfButtonControl();
-  // Serial.println("RF");
-  // Serial.println(sysStatus);
+  Serial.println("RF");
+  Serial.println(sysStatus);
   switchControl();
-  // Serial.println("SWITCH");
-  // Serial.println(sysStatus);
+  Serial.println("SWITCH");
+  Serial.println(sysStatus);
   printData();
   ul end = millis();
   handleDryerTimer(start, end);
-  // Serial.println("FINAL");
-  // Serial.println(sysStatus);
-  Serial.println("\n\n");
-  delay(1500);
+  Serial.println("FINAL");
+  Serial.println(sysStatus);
+  Serial.println("=========================\n\n");
+  delay(100);
 }
 
 #pragma endregion
