@@ -53,9 +53,9 @@ void setupLightSensor() {
 void setupLCD() {
   display.begin();
   display.setContrast(50);
+  display.setTextSize(1);
   display.display(); // show splashscreen
   display.clearDisplay();   // clears the screen and buffer
-  display.setCursor(0, 0);
 }
 
 // set up pin mode for another pins
@@ -93,6 +93,13 @@ void setup_arduino() {
 
 // this region for misc functions
 #pragma region
+
+const char * getStateName() {
+  const char * stateName[] = {
+    "DANG CHO", "DANG PHOI", "DI CHUYEN", "TAM DUNG", "DANG SAY"
+  };
+  return stateName[sysStatus];
+}
 
 template<typename T> byte *convertValueToByteArray(T value) {
   if (value <= 1) value = 0;
@@ -382,7 +389,6 @@ void actionControl(Action action, byte timer = 0) {
       if(sysStatus == DRYER_ACTIVATED)
         actionControl(STOP_DRYER);
       if (isRain) return;
-      Serial.println("ABCCC");
       runDC(FORWARD);
       break;
     }
@@ -478,7 +484,32 @@ void rfButtonControl() {
 }
 
 void printData() {
+  char buffer[96] = {0};
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println();
 
+  sprintf(buffer, "%d", dryerTimer);
+  display.println(buffer);
+
+  sprintf(buffer, "Thoi gian say");
+  display.println(buffer);
+
+  sprintf(buffer, "%s", getStateName());
+  display.println(buffer);
+
+  sprintf(buffer, "Trang thai");
+  display.println(buffer);
+
+  sprintf(buffer, "Nhiet do: %d*C", (int)sensorData.temperature);
+  display.println(buffer);
+
+  sprintf(buffer, "Do Am: %d%%", (int)sensorData.humidity);
+  display.println(buffer);
+
+  sprintf(buffer, "Do Sang: %d lux", sensorData.lux);
+  display.println(buffer);
+  display.display();
 }
 
 void handleDryerTimer(ul start, ul end) {
@@ -503,24 +534,13 @@ void loop_event() {
   ul start = millis();
   readData();
   autoControl();
-  Serial.println("AUTO");
-  Serial.println(sysStatus);
   buttonControl();
-  Serial.println("BUTTON");
-  Serial.println(sysStatus);
   rfButtonControl();
-  Serial.println("RF");
-  Serial.println(sysStatus);
   switchControl();
-  Serial.println("SWITCH");
-  Serial.println(sysStatus);
   printData();
   ul end = millis();
   handleDryerTimer(start, end);
-  Serial.println("FINAL");
-  Serial.println(sysStatus);
-  Serial.println("=========================\n\n");
-  delay(100);
+  delay(250);
 }
 
 #pragma endregion
