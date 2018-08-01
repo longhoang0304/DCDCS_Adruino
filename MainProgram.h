@@ -39,7 +39,8 @@
 #define CLK 18
 
 //dryer H-Bridge pin
-#define DRYER_PIN 30
+#define DRYER_EN4 30
+#define DRYER_EN3 31
 
 // I2C Communication
 #define SCL 21
