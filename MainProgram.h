@@ -45,8 +45,7 @@
 #define SCL 21
 #define SDA 20
 
-#define MASTER_ADDRESS 0x01
-#define SLAVE_ADDRESS 0X02
+#define SLAVE_ADDRESS 8
 
 enum WifiRequestType { PERFORM_ACTION, UPDATE_IP };
 enum SystemStatus { IDLING, DRYING, MOVING, PAUSED, DRYER_ACTIVATED };

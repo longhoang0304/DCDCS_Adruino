@@ -71,7 +71,7 @@ void setupPinMode() {
 }
 
 void setupI2C() {
-  Wire.begin(MASTER_ADDRESS);
+  Wire.begin(SLAVE_ADDRESS);
   Wire.onRequest(sendESP8266Data);
   Wire.onReceive(handleESP8266Request);
 }
@@ -92,10 +92,10 @@ void setup_arduino() {
 // this region for misc functions
 #pragma region
 
-template<typename T> byte *convertValueToByteArray(T value) {
+byte *convertValueToByteArray(uint16_t value) {
   if (value <= 1) value = 0;
-  uint64_t v = *((uint64_t *)((void *)&value));
-  const size_t len = sizeof(T);
+  uint16_t v = value;
+  const size_t len = sizeof(uint16_t);
   byte index = 0;
   byte * arr;
   arr = (byte *)calloc(len, sizeof(byte));
@@ -107,9 +107,9 @@ template<typename T> byte *convertValueToByteArray(T value) {
   return arr;
 }
 
-template<typename T> void copyValueToByteArray(T value, byte *data, byte &i) {
-  byte * arr = convertValueToByteArray<T>(value);
-  byte len = sizeof(T);
+void copyValueToByteArray(uint16_t value, byte *data, byte &i) {
+  byte * arr = convertValueToByteArray(value);
+  byte len = sizeof(uint16_t);
   byte j = 0;
   while(len) {
     data[i++] = arr[j++];
@@ -119,18 +119,22 @@ template<typename T> void copyValueToByteArray(T value, byte *data, byte &i) {
 }
 
 void sendESP8266Data() {
-  const size_t length = sizeof(SensorData);
+  const size_t len = 8;
   byte i = 0;
-  byte data[length] = {0};
+  byte data[len] = {0};
+  uint16_t packedData = dryerTimer | sysStatus << 8;
+  uint16_t weather = 0 | 0 << 8;
 
-  // copy humidity to array
-  copyValueToByteArray<double>(sensorData.humidity, data, i);
   // copy temperatur to array
-  copyValueToByteArray<double>(sensorData.temperature, data, i);
-  // copy lux to array
-  copyValueToByteArray<uint16_t>(sensorData.lux, data, i);
-  // send data to esp8266
-  Wire.write(data, length);
+  copyValueToByteArray(sensorData.temperature, data, i);
+  // copy humidity to array
+  copyValueToByteArray(sensorData.humidity, data, i);
+  // copy status and dryer time
+  copyValueToByteArray(packedData, data, i);
+  // copy weather
+  copyValueToByteArray(weather, data, i);
+
+  Wire.write(data, len);
 }
 
 void handleESP8266Request(int numBytes) {
