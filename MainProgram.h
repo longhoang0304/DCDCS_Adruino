@@ -11,18 +11,18 @@
 #include <Adafruit_PCD8544.h>
 
 // RAIN SENSOR PIN
-#define RAIN_SENSOR_PIN 2
+#define RAIN_SENSOR_PIN 14
 
 // DC CONTROL PIN
-#define ENA 3
-#define ENB 4
+#define ENA 2
+#define ENB 3
 
 // LIMIT SWITCH PIN
-#define L1 5
-#define L2 6
+#define L1 6
+#define L2 7
 
 // DHT PIN
-#define DHT_PIN 7
+#define DHT_PIN 5
 #define DHT_TYPE DHT11
 
 // RF PIN
@@ -32,15 +32,14 @@
 #define BUTTON_D 11
 
 // LCD5110
-#define RST 15
-#define SCE 14
-#define DC  16
-#define DIN 17
-#define CLK 18
+#define RST 16
+#define SCE 15
+#define DC  17
+#define DIN 18
+#define CLK 19
 
 //dryer H-Bridge pin
-#define DRYER_EN4 30
-#define DRYER_EN3 31
+#define DRYER_PIN 4
 
 // I2C Communication
 #define SCL 21

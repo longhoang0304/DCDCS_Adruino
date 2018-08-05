@@ -63,13 +63,11 @@ void setupPinMode() {
   pinMode(RAIN_SENSOR_PIN, INPUT);
   pinMode(L1, INPUT);
   pinMode(L2, INPUT);
-  pinMode(DRYER_EN4, OUTPUT);
-  pinMode(DRYER_EN3, OUTPUT);
+  pinMode(DRYER_PIN, OUTPUT);
   pinMode(BUTTON_A, INPUT);
   pinMode(BUTTON_B, INPUT);
   pinMode(BUTTON_C, INPUT);
   pinMode(BUTTON_D, INPUT);
-  digitalWrite(DRYER_EN3, LOW);
 }
 
 void setupI2C() {
@@ -155,7 +153,7 @@ void handleESP8266Request(int numBytes) {
   }
   switch(data[0]) {
     case PERFORM_ACTION: {
-      actionControl(data[1], data[2]);
+      actionControl(data[1], data[2], data[3]);
       break;
     }
     case UPDATE_IP: {
@@ -418,12 +416,12 @@ void actionControl(Action action, byte timer = 0) {
     case START_DRYER: {
       if(sysStatus != IDLING) return;
       sysStatus = DRYER_ACTIVATED;
-      digitalWrite(DRYER_EN4, HIGH);
+      digitalWrite(DRYER_PIN, HIGH);
       break;
     }
     case STOP_DRYER: {
       sysStatus = IDLING;
-      digitalWrite(DRYER_EN4, LOW);
+      digitalWrite(DRYER_PIN, LOW);
       dryerTimer = 30;
       break;
     }
