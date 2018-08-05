@@ -3,7 +3,6 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <DHT.h>
-#include <Thread.h>
 #include <Keypad.h>
 #include <DCMotor.h>
 #include <BH1750FVI.h>
