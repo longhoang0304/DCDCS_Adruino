@@ -31,7 +31,7 @@ static byte dryerTimer = 1; // default 30 minutes
 // pulse cuont for button press
 static byte motorBtnPulse = 0;
 // pulse count for dryer button press
-static byte dryerBtnPulse = 0;
+static byte dryerBtnPulse = 1;
 // data from sensors
 static SensorData sensorData;
 // ip address
@@ -209,13 +209,13 @@ Action determineMotorAction() {
  * Determine dryer action by dryer button pulse
  */
 Action determineDryerAction() {
-  if(sysStatus != IDLING) {
-    dryerBtnPulse = 1;
-    return NO_ACTION;
-  }
   dryerBtnPulse = (dryerBtnPulse + 1) % 2;
   switch(dryerBtnPulse) {
     case 0: {
+      if(sysStatus != IDLING) {
+        dryerBtnPulse = 1;
+        return NO_ACTION;
+      }
       return START_DRYER;
     }
     case 1: {
@@ -230,6 +230,8 @@ Action determineDryerAction() {
  * Get action from key
  */
 Action getAction(byte key) {
+  // Serial.print("Key: ");
+  // Serial.println(key);
   if (key == 1) {
     return determineMotorAction();
   }
@@ -251,6 +253,8 @@ Action getAction(byte key) {
  */
 Action getActionFromKeyPad() {
   char key = keypad.getKey();
+  // Serial.print("BUTTON: ");
+  // Serial.println(key);
   if(key == NO_KEY) {
     return getAction(-1);
   }
@@ -277,6 +281,11 @@ byte readRfButton() {
  */
 Action getActionFromRF() {
   byte key = readRfButton();
+  // Serial.print("RF: ");
+  // if (key)
+  //   Serial.println(key);
+  // else
+  //   Serial.println();
   return getAction(key);
 }
 
@@ -540,8 +549,10 @@ void loop_event() {
   rfButtonControl();
   switchControl();
   printData();
-  Serial.println(sysStatus);
-  delay(250);
+  // Serial.print("Status: ");
+  // Serial.println(sysStatus);
+  // Serial.println();
+  delay(50);
   ul end = millis();
   handleDryerTimer(start, end);
 }
