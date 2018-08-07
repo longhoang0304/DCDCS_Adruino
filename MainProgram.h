@@ -75,8 +75,8 @@ static byte colPins[COLS] = {23, 25, 27, 29}; //connect to the column pinouts of
 
 typedef struct data {
   uint16_t lux;
-  double humidity;
-  double temperature;
+  int16_t humidity;
+  int16_t temperature;
 } SensorData;
 
 union address {
@@ -88,8 +88,8 @@ typedef struct IPAddress {
   address address;
 } IPAddress;
 
-typedef unsigned long ul;
-#define ONE_MINUTE 1000 * 60
+typedef long ul;
+#define ONE_MINUTE (ul)60 * 1000
 
 void loop_event();
 void setup_arduino();

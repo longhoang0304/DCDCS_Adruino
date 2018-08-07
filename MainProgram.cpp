@@ -4,7 +4,7 @@
  */
 
 void sendESP8266Data();
-void handleESP8266Request(int numBytes);
+void handleESP8266Action(int numBytes);
 void actionControl(Action action, byte timer = 0);
 
 #pragma region
@@ -27,7 +27,7 @@ static SystemStatus sysStatus;
 // check if user is taking control
 static bool userControl = false;
 // timer for dryer
-static byte dryerTimer = 30; // default 30 minutes
+static byte dryerTimer = 1; // default 30 minutes
 // pulse cuont for button press
 static byte motorBtnPulse = 0;
 // pulse count for dryer button press
@@ -73,7 +73,7 @@ void setupPinMode() {
 void setupI2C() {
   Wire.begin(SLAVE_ADDRESS);
   Wire.onRequest(sendESP8266Data);
-  Wire.onReceive(handleESP8266Request);
+  Wire.onReceive(handleESP8266Action);
 }
 
 // setup all arduino
@@ -84,7 +84,8 @@ void setup_arduino() {
   dht.begin();
   dcMotor.begin();
   setupPinMode();
-  sysStatus = DRYING;
+  // sysStatus = DRYING;
+  sysStatus = IDLING;
   Serial.begin(9600);
 }
 #pragma endregion
@@ -126,12 +127,11 @@ void copyValueToByteArray(uint16_t value, byte *data, byte &i) {
 }
 
 void sendESP8266Data() {
-  const size_t len = 8;
+  const size_t len = sizeof(uint16_t) * 4;
   byte i = 0;
   byte data[len] = {0};
   uint16_t packedData = dryerTimer | sysStatus << 8;
   uint16_t weather = 0 | 0 << 8;
-
   // copy temperatur to array
   copyValueToByteArray(sensorData.temperature, data, i);
   // copy humidity to array
@@ -144,16 +144,16 @@ void sendESP8266Data() {
   Wire.write(data, len);
 }
 
-void handleESP8266Request(int numBytes) {
+void handleESP8266Action(int numBytes) {
   byte data[numBytes] = {0};
   byte i = 0;
-  while(1 < Wire.available()) {
+  while(Wire.available()) {
     data[i] = Wire.read();
     i++;
   }
   switch(data[0]) {
     case PERFORM_ACTION: {
-      actionControl(data[1], data[2], data[3]);
+      actionControl(data[1], data[2]);
       break;
     }
     case UPDATE_IP: {
@@ -190,8 +190,10 @@ Switch getSwitch() {
 Action determineMotorAction() {
   switch(sysStatus) {
     case DRYING:
+      motorBtnPulse = 0;
       return COLLECT_CLOTHES;
     case IDLING:
+      motorBtnPulse = 1;
       return DRY_CLOTHES;
     case MOVING:
       return PAUSE_MOTOR;
@@ -207,20 +209,16 @@ Action determineMotorAction() {
  * Determine dryer action by dryer button pulse
  */
 Action determineDryerAction() {
+  if(sysStatus != IDLING) {
+    dryerBtnPulse = 1;
+    return NO_ACTION;
+  }
   dryerBtnPulse = (dryerBtnPulse + 1) % 2;
   switch(dryerBtnPulse) {
     case 0: {
-      if(sysStatus != IDLING) {
-        dryerBtnPulse = 0;
-        return NO_ACTION;
-      }
       return START_DRYER;
     }
     case 1: {
-      if (sysStatus != DRYER_ACTIVATED) {
-        dryerBtnPulse = 1;
-        return NO_ACTION;
-      }
       return STOP_DRYER;
     }
   }
@@ -339,8 +337,8 @@ void decreaseTimer() {
  * Read data from sensor
  */
 void readData() {
-  sensorData.humidity = dht.readHumidity();
-  sensorData.temperature = dht.readTemperature();
+  sensorData.humidity = (int16_t)dht.readHumidity();
+  sensorData.temperature = (int16_t)dht.readTemperature();
   sensorData.lux = LightSensor.GetLightIntensity();
 }
 
@@ -422,7 +420,9 @@ void actionControl(Action action, byte timer = 0) {
     case STOP_DRYER: {
       sysStatus = IDLING;
       digitalWrite(DRYER_PIN, LOW);
-      dryerTimer = 30;
+      dryerBtnPulse = 1;
+      dryerTimer = 1;
+      accTime = 0;
       break;
     }
     default: {
@@ -540,9 +540,10 @@ void loop_event() {
   rfButtonControl();
   switchControl();
   printData();
+  Serial.println(sysStatus);
+  delay(250);
   ul end = millis();
   handleDryerTimer(start, end);
-  delay(250);
 }
 
 #pragma endregion
