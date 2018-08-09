@@ -516,10 +516,10 @@ void printData() {
   display.println(buffer);
 
   sprintf(buffer, "%d.%d.%d.%d",
-    255,
-    255,
-    255,
-    255
+    ip.address.bytes[0],
+    ip.address.bytes[1],
+    ip.address.bytes[2],
+    ip.address.bytes[3]
   );
   display.println(buffer);
 
