@@ -27,7 +27,7 @@ static SystemStatus sysStatus;
 // check if user is taking control
 static bool userControl = false;
 // timer for dryer
-static byte dryerTimer = 1; // default 30 minutes
+static byte dryerTimer = 30; // default 30 minutes
 // pulse cuont for button press
 static byte motorBtnPulse = 0;
 // pulse count for dryer button press
@@ -95,7 +95,7 @@ void setup_arduino() {
 
 const char * getStateName() {
   const char * stateName[] = {
-    "DANG CHO", "DANG PHOI", "DI CHUYEN", "TAM DUNG", "DANG SAY"
+    "IDLING", "DRYING", "MOVING", "PAUSED", "DRYER ON"
   };
   return stateName[sysStatus];
 }
@@ -159,10 +159,8 @@ void handleESP8266Action(int numBytes) {
     case UPDATE_IP: {
       uint32_t dword = 0;
       for(int i = 1; i < 5; i++) {
-        dword += data[i];
-        dword <<= 0x08;
+        ip.address.bytes[i - 1] = data[i];
       }
-      ip.address.dword = dword;
       break;
     }
     default:
@@ -430,7 +428,7 @@ void actionControl(Action action, byte timer = 0) {
       sysStatus = IDLING;
       digitalWrite(DRYER_PIN, LOW);
       dryerBtnPulse = 1;
-      dryerTimer = 1;
+      dryerTimer = 30;
       accTime = 0;
       break;
     }
@@ -498,29 +496,38 @@ void printData() {
   char buffer[96] = {0};
   display.clearDisplay();
   display.setCursor(0, 0);
-  display.println();
 
   sprintf(buffer, "%d", dryerTimer);
   display.println(buffer);
 
-  sprintf(buffer, "Thoi gian say");
+  sprintf(buffer, "Dryer timer:");
   display.println(buffer);
 
   sprintf(buffer, "%s", getStateName());
   display.println(buffer);
 
-  sprintf(buffer, "Trang thai");
+  sprintf(buffer, "Status:");
   display.println(buffer);
 
-  sprintf(buffer, "Nhiet do: %d*C", (int)sensorData.temperature);
+  sprintf(buffer, "Temperature: %d*C", (int)sensorData.temperature);
   display.println(buffer);
 
-  sprintf(buffer, "Do Am: %d%%", (int)sensorData.humidity);
+  sprintf(buffer, "Humidity: %d%%", (int)sensorData.humidity);
   display.println(buffer);
 
-  sprintf(buffer, "Do Sang: %d lux", sensorData.lux);
+  sprintf(buffer, "%d.%d.%d.%d",
+    255,
+    255,
+    255,
+    255
+  );
   display.println(buffer);
+
+  sprintf(buffer, "IP Address:");
+  display.println(buffer);
+
   display.display();
+
 }
 
 void handleDryerTimer(ul start, ul end) {
