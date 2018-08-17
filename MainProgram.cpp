@@ -385,6 +385,8 @@ void controlDCAtDay() {
  */
 void actionControl(Action action, byte timer = 0) {
   bool isRain = isRaining();
+  // if (sysStatus == MOVING && action != PAUSE_MOTOR)
+  //   return;
   switch(action) {
     case PAUSE_MOTOR: {
       if (sysStatus != MOVING)
@@ -556,9 +558,9 @@ void loop_event() {
   rfButtonControl();
   switchControl();
   printData();
-  // Serial.print("Status: ");
-  // Serial.println(sysStatus);
-  // Serial.println();
+  Serial.print("Status: ");
+  Serial.println(sysStatus);
+  Serial.println();
   delay(50);
   ul end = millis();
   handleDryerTimer(start, end);
