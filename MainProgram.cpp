@@ -50,7 +50,7 @@ void setupLightSensor() {
 // setup lcd
 void setupLCD() {
   display.begin();
-  display.setContrast(0);
+  display.setContrast(50);
   display.display(); // show splashscreen
   display.clearDisplay();   // clears the screen and buffer
 }
@@ -83,7 +83,7 @@ void setup_arduino() {
   setupLightSensor();
   // Serial.println("DONE Light");
   // sysStatus = DRYING;
-  Serial.begin(9600);
+  // Serial.begin(9600);
   sysStatus = IDLING;
 }
 #pragma endregion
@@ -272,11 +272,6 @@ byte readRfButton() {
  */
 Action getActionFromRF() {
   byte key = readRfButton();
-  // Serial.print("RF: ");
-  // if (key)
-  //   Serial.println(key);
-  // else
-  //   Serial.println();
   return getAction(key);
 }
 
@@ -340,6 +335,7 @@ void readData() {
   sensorData.humidity = (int16_t)dht.readHumidity();
   sensorData.temperature = (int16_t)dht.readTemperature();
   sensorData.lux = LightSensor.GetLightIntensity();
+  // Serial.println(sensorData.lux);
 }
 
 /**
@@ -489,7 +485,7 @@ void rfButtonControl() {
 
 void printData() {
   char buffer[96] = {0};
-  display.setContrast(0);
+  // display.setContrast(0);
   display.clearDisplay();
   display.setCursor(0, 0);
 
