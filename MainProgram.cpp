@@ -34,8 +34,6 @@ static byte motorBtnPulse = 0;
 static byte dryerBtnPulse = 1;
 // data from sensors
 static SensorData sensorData;
-// ip address
-static IPAddress ip = {0};
 // lcd5110
 Adafruit_PCD8544 display = Adafruit_PCD8544(CLK, DIN, DC, SCE, RST);
 //
@@ -52,8 +50,7 @@ void setupLightSensor() {
 // setup lcd
 void setupLCD() {
   display.begin();
-  display.setContrast(50);
-  display.setTextSize(1);
+  display.setContrast(0);
   display.display(); // show splashscreen
   display.clearDisplay();   // clears the screen and buffer
 }
@@ -79,14 +76,15 @@ void setupI2C() {
 // setup all arduino
 void setup_arduino() {
   setupLCD();
-  setupLightSensor();
   setupI2C();
   dht.begin();
   dcMotor.begin();
   setupPinMode();
+  setupLightSensor();
+  // Serial.println("DONE Light");
   // sysStatus = DRYING;
-  sysStatus = IDLING;
   Serial.begin(9600);
+  sysStatus = IDLING;
 }
 #pragma endregion
 
@@ -127,7 +125,7 @@ void copyValueToByteArray(uint16_t value, byte *data, byte &i) {
 }
 
 void sendESP8266Data() {
-  const size_t len = sizeof(uint16_t) * 4;
+  const size_t len = sizeof(uint16_t) * 5;
   byte i = 0;
   byte data[len] = {0};
   uint16_t packedData = dryerTimer | sysStatus << 8;
@@ -136,6 +134,8 @@ void sendESP8266Data() {
   copyValueToByteArray(sensorData.temperature, data, i);
   // copy humidity to array
   copyValueToByteArray(sensorData.humidity, data, i);
+  // copy drying time to array
+  copyValueToByteArray(dryerTimer, data, i);
   // copy status and dryer time
   copyValueToByteArray(packedData, data, i);
   // copy weather
@@ -154,13 +154,6 @@ void handleESP8266Action(int numBytes) {
   switch(data[0]) {
     case PERFORM_ACTION: {
       actionControl(data[1], data[2]);
-      break;
-    }
-    case UPDATE_IP: {
-      uint32_t dword = 0;
-      for(int i = 1; i < 5; i++) {
-        ip.address.bytes[i - 1] = data[i];
-      }
       break;
     }
     default:
@@ -496,6 +489,7 @@ void rfButtonControl() {
 
 void printData() {
   char buffer[96] = {0};
+  display.setContrast(0);
   display.clearDisplay();
   display.setCursor(0, 0);
 
@@ -511,18 +505,13 @@ void printData() {
   sprintf(buffer, "Status:");
   display.println(buffer);
 
-  sprintf(buffer, "Temperature: %d*C", (int)sensorData.temperature);
+  sprintf(buffer, "Temp: %d*C", (int)sensorData.temperature);
   display.println(buffer);
 
   sprintf(buffer, "Humidity: %d%%", (int)sensorData.humidity);
   display.println(buffer);
 
-  sprintf(buffer, "%d.%d.%d.%d",
-    ip.address.bytes[0],
-    ip.address.bytes[1],
-    ip.address.bytes[2],
-    ip.address.bytes[3]
-  );
+  sprintf(buffer, "10.0.1.1");
   display.println(buffer);
 
   sprintf(buffer, "IP Address:");
@@ -558,9 +547,6 @@ void loop_event() {
   rfButtonControl();
   switchControl();
   printData();
-  Serial.print("Status: ");
-  Serial.println(sysStatus);
-  Serial.println();
   delay(50);
   ul end = millis();
   handleDryerTimer(start, end);
