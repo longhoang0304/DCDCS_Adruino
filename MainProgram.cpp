@@ -272,6 +272,10 @@ byte readRfButton() {
  */
 Action getActionFromRF() {
   byte key = readRfButton();
+  // if(key) {
+  //   Serial.print("RF");
+  //   Serial.println(key);
+  // }
   return getAction(key);
 }
 
