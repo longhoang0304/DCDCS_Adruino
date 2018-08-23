@@ -153,7 +153,13 @@ void handleESP8266Action(int numBytes) {
   }
   switch(data[0]) {
     case PERFORM_ACTION: {
-      actionControl(data[1], data[2]);
+      switch(data[1]) {
+        case 1:
+          actionControl(determineMotorAction());
+          break;
+        case 2:
+          actionControl(determineDryerAction(), data[2]);
+      }
       break;
     }
     default:
