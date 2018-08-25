@@ -6,6 +6,8 @@
 void sendESP8266Data();
 void handleESP8266Action(int numBytes);
 void actionControl(Action action, byte timer = 0);
+Action determineDryerAction();
+Action determineMotorAction();
 
 #pragma region
 // init light sensor object
@@ -83,7 +85,7 @@ void setup_arduino() {
   setupLightSensor();
   // Serial.println("DONE Light");
   // sysStatus = DRYING;
-  // Serial.begin(9600);
+  Serial.begin(115200);
   sysStatus = IDLING;
 }
 #pragma endregion
@@ -128,8 +130,9 @@ void sendESP8266Data() {
   const size_t len = sizeof(uint16_t) * 5;
   byte i = 0;
   byte data[len] = {0};
-  uint16_t packedData = dryerTimer | sysStatus << 8;
+  uint16_t packedData = dryerTimer | (byte)sysStatus << 8;
   uint16_t weather = 0 | 0 << 8;
+  // Serial.println(sysStatus);
   // copy temperatur to array
   copyValueToByteArray(sensorData.temperature, data, i);
   // copy humidity to array
@@ -171,7 +174,7 @@ void handleESP8266Action(int numBytes) {
  * Read switch signal and return
  */
 Switch getSwitch() {
-  if (sysStatus != MOVING) return;
+  if (sysStatus != MOVING) return NO_SWITCH;
   bool l1 = digitalRead(L1);
   bool l2 = digitalRead(L2);
   if (l1 && l2) return NO_SWITCH;
@@ -289,7 +292,7 @@ Action getActionFromRF() {
  * Check if is night or not
  */
 bool isNight(uint16_t lux) {
-  return lux < 5;
+  return lux < 3;
 }
 
 /**
@@ -444,6 +447,7 @@ void actionControl(Action action, byte timer = 0) {
  */
 void autoControl() {
   if (isNight(sensorData.lux)) {
+    // Serial.println("ABC");
     controlDCAtNight();
     return;
   }
@@ -455,6 +459,8 @@ void autoControl() {
  */
 void switchControl() {
   Switch swt = getSwitch();
+  // Serial.print("SWITCH: ");
+  // Serial.println(swt);
   if (dcMotor.getDirection() == SCALAR)
     return;
   switch(swt) {
@@ -549,9 +555,13 @@ void loop_event() {
   ul start = millis();
   readData();
   autoControl();
+  // Serial.print("SYS AUTO STATE: ");
+  // Serial.println(isRaining());
   buttonControl();
   rfButtonControl();
   switchControl();
+  // Serial.print("SYS SWITCH STATE: ");
+  // Serial.println(sysStatus);
   printData();
   delay(50);
   ul end = millis();
