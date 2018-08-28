@@ -6,6 +6,9 @@
 void sendESP8266Data();
 void handleESP8266Action(int numBytes);
 void actionControl(Action action, byte timer = 0);
+bool isRaining();
+bool isNight(uint16_t);
+void readData();
 
 #pragma region
 // init light sensor object
@@ -38,6 +41,10 @@ static SensorData sensorData;
 Adafruit_PCD8544 display = Adafruit_PCD8544(CLK, DIN, DC, SCE, RST);
 //
 static ul accTime = 0;
+
+// system time event
+SystemTimeEvent sysTimeEvent;
+SystemRainEvent sysRainEvent;
 
 void setupLightSensor() {
   //  LightSensor.SetAddress(Device_Address_H);//Address 0x5C
@@ -73,6 +80,14 @@ void setupI2C() {
   Wire.onReceive(handleESP8266Action);
 }
 
+void initSystemEvent() {
+  readData();
+  bool isNight = isNight(sensorData.lux);
+  bool isRain = isRaining();
+  if (isNight) sysTimeEvent = NIGHT_DETECTED;
+  if (isRain) sysRainEvent = RAIN_STARTED;
+}
+
 // setup all arduino
 void setup_arduino() {
   setupLCD();
@@ -84,6 +99,7 @@ void setup_arduino() {
   // Serial.println("DONE Light");
   // sysStatus = DRYING;
   // Serial.begin(9600);
+  initSystemEvent();
   sysStatus = IDLING;
 }
 #pragma endregion
@@ -153,13 +169,9 @@ void handleESP8266Action(int numBytes) {
   }
   switch(data[0]) {
     case PERFORM_ACTION: {
-      switch(data[1]) {
-        case 1:
-          actionControl(determineMotorAction());
-          break;
-        case 2:
-          actionControl(determineDryerAction(), data[2]);
-      }
+      if (data[i] < 1 || data[i] > 11) data[i] = 11; // NO_ACTION
+      Action act = static_cast<Action>(data[1] - 1);
+      actionControl(act, data[2]);
       break;
     }
     default:
@@ -289,7 +301,7 @@ Action getActionFromRF() {
  * Check if is night or not
  */
 bool isNight(uint16_t lux) {
-  return lux < 5;
+  return lux < 3;
 }
 
 /**
@@ -352,9 +364,18 @@ void readData() {
  * Control system when night
  */
 void controlDCAtNight() {
+  bool isRain = isRaining();
   switch (sysStatus) {
+    case PAUSED:
+    case MOVING:
     case DRYING:
-      runDC(BACKWARD);
+      if (sysTimeEvent == DAY_DETECTED) {
+        actionControl(COLLECT_CLOTHES);
+        sysTimeEvent = NIGHT_DETECTED;
+      }
+      if (isRain) {
+        actionControl(COLLECT_CLOTHES);
+      }
       break;
   }
 }
@@ -365,17 +386,25 @@ void controlDCAtNight() {
 void controlDCAtDay() {
   bool isRain = isRaining();
   switch (sysStatus) {
-    case PAUSED:
-    case DRYING:
-      if (isRain) {
-        runDC(BACKWARD);
+    case IDLING: {
+      if (sysTimeEvent == NIGHT_DETECTED) {
+        actionControl(DRY_CLOTHES);
+        sysTimeEvent = DAY_DETECTED;
+      }
+      if (!isRain && sysRainEvent == RAIN_STARTED) {
+        actionControl(DRY_CLOTHES);
+        sysRainEvent = RAIN_STOPED;
       }
       break;
-    // case IDLING:
-    //   if (!isRain) {
-    //     runDC(FORWARD);
-    //   }
-    //   break;
+    }
+    case PAUSED:
+    case MOVING:
+    case DRYING:
+      if (isRain) {
+        actionControl(COLLECT_CLOTHES);
+        sysRainEvent = RAIN_STARTED;
+      }
+      break;
   }
 }
 
@@ -391,6 +420,10 @@ void actionControl(Action action, byte timer = 0) {
       if (sysStatus != MOVING)
         break;
       stopDC(PAUSED);
+      break;
+    }
+    case RESUME_MOTOR: {
+      actionControl(determineMotorAction());
       break;
     }
     case DRY_CLOTHES: {
@@ -412,11 +445,14 @@ void actionControl(Action action, byte timer = 0) {
       decreaseTimer();
       break;
     }
-    case SET_DRYER_TIME: {
+    case START_DRYER_MOBILE: {
       dryerTimer = timer;
+      actionControl(START_DRYER);
+      break;
     }
     case RESET_DRYER_TIMER: {
       dryerTimer = 30;
+      accTime = 0;
       break;
     }
     case START_DRYER: {
@@ -427,10 +463,9 @@ void actionControl(Action action, byte timer = 0) {
     }
     case STOP_DRYER: {
       sysStatus = IDLING;
-      digitalWrite(DRYER_PIN, LOW);
       dryerBtnPulse = 1;
-      dryerTimer = 30;
-      accTime = 0;
+      digitalWrite(DRYER_PIN, LOW);
+      actionControl(RESET_DRYER_TIMER);
       break;
     }
     default: {
