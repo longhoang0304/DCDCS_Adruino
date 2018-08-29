@@ -53,14 +53,18 @@ enum Action {
   DRY_CLOTHES,
   COLLECT_CLOTHES,
   PAUSE_MOTOR,
+  RESUME_MOTOR, //this action can only perform through android app
   INCREASE_DRYER_TIME,
   DECREASE_DRYER_TIME,
-  SET_DRYER_TIME, //this action can only perform through android app
+  START_DRYER_MOBILE, //this action can only perform through android app
   START_DRYER,
   STOP_DRYER,
   RESET_DRYER_TIMER,
   NO_ACTION,
 };
+
+enum SystemTimeEvent {NIGHT_DETECTED, DAY_DETECTED};
+enum SystemRainEvent {RAIN_STARTED, RAIN_STOPED};
 
 #define ROWS 4 //four rows
 #define COLS 4 //four columns
